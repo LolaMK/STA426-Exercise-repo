@@ -1,0 +1,38 @@
+---
+title: "Exercise 1b"
+author: "Lola Kourouma"
+date: "9/29/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 100 values from a log-normal distribution (mu=1, sigma=.25)
+
+``` {r Sampling}
+Sample <- rnorm(100, mean=1, sd=0.25)
+Sample
+```
+
+## Histogram of the distribution
+
+``` {r Histogram}
+hist(Sample, freq = FALSE, ylim=c(0,2))
+curve(dnorm(x, mean=mean(Sample), sd=sd(Sample)), add=TRUE, col="red")
+```
+
+## Distribution on the log scale
+
+``` {r distribution}
+curve(dlnorm(x, meanlog=mean(Sample), sd=sd(Sample)), from=0, to=10)
+```
+
+## Mean and variance of the sample
+
+``` {r mean and variance}
+mean(Sample)
+var(Sample)
+```
+
