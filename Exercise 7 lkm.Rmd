@@ -1,0 +1,202 @@
+---
+title: "Exercise 7 lkm"
+author: "Lola Kourouma"
+date: "11/3/2020"
+output: html_document
+---
+
+## Exercise 7: playing with design/contrast matrices, UpSet plots and differential expression with count data
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message=FALSE}
+library("limma")
+library("affy")
+library("preprocessCore")
+library("UpSetR")
+```
+
+### Question 1. Using the estrogen dataset from Exercise 5, create an UpSet plot summarizing the numbers of differentially expressed genes for the 3 contrasts: ‘E10’, ‘E48’ and ‘Time’ (contrasts as defined in Exercise 5 using makeContrasts()). Hint: you can use decideTests() to summarize the results, given some thresholds. UpSet plots are the new Venn diagrams and can be created with the UpSetR package.
+
+```{r}
+unzip("affy_estrogen.zip")
+ddir <- "affy_estrogen"
+dir(ddir) 
+```
+
+```{r}
+# preprocess affymetrix data
+targets <- readTargets("targets.txt", path=ddir)
+targets
+```
+
+```{r, message=FALSE}
+abatch <- ReadAffy(filenames=targets$filename,
+                   celfile.path=ddir)
+eset <- rma(abatch)  # bg correct, normalize, summarize
+
+```
+
+```{r, message=FALSE}
+# do the limma modeling
+f <- paste(targets$estrogen,targets$time.h,sep="")
+f <- factor(f)
+
+# create design matrix
+design <- model.matrix(~0+f)
+colnames(design) <- levels(f)
+design
+```
+
+```{r}
+fit <- lmFit(eset, design)
+
+cont.matrix <- makeContrasts(E10="present10-absent10",
+                             E48="present48-absent48",
+                             Time="absent48-absent10",levels=design)
+cont.matrix
+```
+
+```{r}
+fit2  <- contrasts.fit(fit, cont.matrix)
+fit2  <- eBayes(fit2)      #compute t-stat, F-stat, log-odds
+class(fit2)
+```
+
+```{r}
+#summarizing the results using decideTests()
+
+summ <- decideTests(object = fit2, p.value = 0.05)
+
+summ <- (abs(summ))
+            
+head(summ, 10)
+
+```
+
+```{r}
+#generating an UpSet plot
+
+summdata <- as.data.frame(summ)
+str(summdata)
+
+upset(summdata)
+
+```
+
+### Question 3. Fix the code above to work on the count table that was already read in. Add in some spot checks, including an MDS plot from plotMDS() (or similar), a look at the dispersion-mean plot using plotBCV() (or similar) and a look at the overall M vs A plot using plotSmear() (or similar).
+
+```{r, message=FALSE}
+
+library("edgeR")
+samples <- read.table("samples.txt", header=TRUE,
+                      row.names=5, stringsAsFactors=FALSE)
+samples
+
+```
+
+```{r}
+counts <- readDGE(samples$countfile)$counts
+head(counts)
+```
+
+```{r}
+(grp <- gsub("\\-.[0-9]*","",colnames(counts)))
+
+```
+
+```{r}
+
+group <- factor(c(1,1,1,2,2,2,2))
+
+y <- DGEList(counts=counts,group=group)
+
+y <- calcNormFactors(y)
+
+y$samples
+```
+
+```{r}
+#design matrix 
+des <- model.matrix(~group)
+des
+```
+
+```{r}
+
+y <- estimateDisp(y,des)
+#To perform likelihood ratio tests:
+fit_ <- glmFit(y,des)
+lrt <- glmLRT(fit_,coef=2)
+topTags(lrt)
+
+```
+
+#### MDS plot:
+```{r}
+num.group <- as.numeric(group)
+plotMDS(y, top=200, labels = samples$rep, col=num.group)
+
+```
+
+
+#### Dispersion-Mean-Plot:
+```{r}
+
+plotBCV(y)
+
+```
+
+
+#### Overall M vs A plot 
+```{r}
+
+plotSmear(y)
+
+```
+
+
+### Question 4. For the MDS plot, investigate what happens differently when you call plotMDS() on the DGEList object and when you call it on the normalized counts – for normalized counts, see the cpm() function. Explain why it is different.
+
+```{r}
+
+norm_counts <- cpm(counts)
+head(norm_counts)
+
+plotMDS(norm_counts, top=200, labels = samples$rep, col=num.group)
+
+```
+
+
+### Question 5. Again, the above code for voom is not run here. Fix this code to work with the count dataset above and then do some ``spot checks’’ of the genes called DE. For example, make a plot of the plot of estimated fold changes for the two methods (limma and edgeR), compare the P-values of the two methods, or create a venn diagram of the called sets of DE genes at a set threshold.
+
+```{r}
+
+v <- voom(y, design=des, plot = TRUE)
+vf = lmFit(v, design = des) 
+vf = eBayes(vf)
+topTable(vf, coef=2)
+
+```
+
+#### Spot check of the genes called DE:
+
+```{r}
+pv <- vf$p.value
+str(pv)
+```
+
+```{r}
+plrt <- lrt$table$PValue
+str(plrt)
+```
+
+```{r}
+
+plot(plrt, pv[,2], xlab = "P edgeR", ylab = "P Voom")
+
+```
+
+
